@@ -13,12 +13,24 @@ project "App"
     }
 
     includedirs {
-
+        "src",
+        "vendor/raylib/src",
+        "vendor/raylib/src/external/glfw/include"
+    }
+    
+    links {
+        "Raylib"
     }
 
-    defines {
-
-    }
+    filter "system:windows"
+        links {
+            "opengl32.lib",
+            "winmm.lib",
+            "user32.lib"
+        }
+        linkoptions {
+            "/FORCE:MULTIPLE"
+        }
 
     filter "configurations:Debug"
         defines "APP_DEBUG"

@@ -11,6 +11,7 @@ workspace "Wreck"
         buildoptions {"/utf-8"}
 
 -- Third-party Projects
+include "App/vendor/raylib/Raylib.lua"
 
 -- Engine Projects
 include "App/App.lua"
