@@ -1,7 +1,7 @@
 workspace "Wreck"
     architecture "x64"
     configurations { "Debug", "Release" }
-    startproject "App"
+    startproject "Wreck-App"
 
     output_bin = "%{wks.location}/Build/output"
     output_int = "%{wks.location}/Build/intermediate/%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}/%{prj.name}"
@@ -15,3 +15,4 @@ include "App/vendor/raylib/Raylib.lua"
 
 -- Engine Projects
 include "App/App.lua"
+include "Compiler/Compiler.lua"

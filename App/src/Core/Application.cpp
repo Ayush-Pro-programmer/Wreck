@@ -1,13 +1,18 @@
-#include "Wreck.h"
+#include "raylib.h"
 #include "Application.h"
 
 namespace Wreck {
 
-	Application::Application()
+	Application* Application::s_Instance = nullptr;
+
+	Application::Application(const AppDesc& desc)
+		: m_AppDesc(desc)
 	{
-		int WindowWidth = 1280;
-		int WindowHeight = 720;
-		const char* WindowTitle = "[Wreck]";
+		s_Instance = this;
+
+		int WindowWidth = m_AppDesc.Width;
+		int WindowHeight = m_AppDesc.Height;
+		const char* WindowTitle = m_AppDesc.Name.c_str();
 
 		InitWindow(WindowWidth, WindowHeight, WindowTitle);
 		SetTargetFPS(60);
@@ -18,15 +23,42 @@ namespace Wreck {
 		CloseWindow();
 	}
 
+	void Application::PushLayer(Layer* layer)
+	{
+		m_LayerStack.PushLayer(layer);
+	}
+
+	void Application::PushOverlay(Layer* overlay)
+	{
+		m_LayerStack.PushOverlay(overlay);
+	}
+
+	void Application::PopLayer(Layer* layer)
+	{
+		m_LayerStack.PopLayer(layer);
+	}
+
+	void Application::PopOverlay(Layer* overlay)
+	{
+		m_LayerStack.PopOverlay(overlay);
+	}
+
 	void Application::Run()
 	{
-		while (!WindowShouldClose())
+		while (!WindowShouldClose() && m_Running)
 		{
+			float dt = GetFrameTime();
+
+			// Update all layers
+			for (Layer* layer : m_LayerStack)
+				layer->OnUpdate(dt);
+
 			BeginDrawing();
 			ClearBackground(SKYBLUE);
 
-			DrawFPS(10, 10);
-			DrawText("Wreck Engine", 10, 30, 20, RAYWHITE);
+			// Render all layers
+			for (Layer* layer : m_LayerStack)
+				layer->OnRender();
 
 			EndDrawing();
 		}
