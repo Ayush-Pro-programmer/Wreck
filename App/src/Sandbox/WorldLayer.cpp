@@ -6,98 +6,108 @@ WorldLayer::WorldLayer()
 
 void WorldLayer::OnAttach()
 {
+    DisableCursor();
+
     m_Camera.position = { 0.0f, 2.0f, 6.0f };
     m_Camera.target = { 0.0f, 0.0f, 0.0f };
     m_Camera.up = { 0.0f, 1.0f, 0.0f };
     m_Camera.fovy = 45.0f;
     m_Camera.projection = CAMERA_PERSPECTIVE;
 
-    std::string mapPath = "E:/Programming/C++/Repos/Wreck/Assets/Maps/test.wdf";
+    std::string mapPath = "E:/Programming/C++/Repos/Wreck/Assets/Maps/test_01.wdf";
 
-    if (Wreck::MapLoader::LoadWDF(mapPath, m_MapMeshes))
+    if (m_TestMap.Load(mapPath, worldScale))
     {
-        m_MapRenderer.Initialize(m_MapMeshes);
-        TraceLog(LOG_INFO, "[WorldLayer] Map loaded successfully!");
+        for (const auto& rawEntities : m_TestMap.GetEntities())
+        {
+            auto entity = Wreck::EntityRegistry::Create(rawEntities.classname);
+            if (entity)
+            {
+                entity->ParseProperties(rawEntities.properties, worldScale);
+                entity->Spawn();
+                m_Entities.push_back(std::move(entity));
+            }
+            else
+                TraceLog(LOG_WARNING, "[Entity] Unregistered entity classname: %s", rawEntities.classname.c_str());
+        }
     }
-    else
-        TraceLog(LOG_ERROR, "[WorldLayer] Failed to load map: %u", mapPath);
 }
 
 void WorldLayer::OnDetach()
 {
-    m_MapRenderer.Unload();
+    for (auto& entity : m_Entities)
+        entity->Unload();
+    m_Entities.clear();
+
+    m_TestMap.Unload();
 }
+
+static float testBoxY = 1.0f;
+static Vector3 boxSize = { 1.0f, 1.0f, 1.0f };
+static Vector3 boxCenter = { 0.0f, testBoxY, 0.0f };
+static BoundingBox testBox = {
+    {boxCenter.x - boxSize.x * 0.5f, boxCenter.y - boxSize.y * 0.5f, boxCenter.z - boxSize.z * 0.5f, },
+    {boxCenter.x + boxSize.x * 0.5f, boxCenter.y + boxSize.y * 0.5f, boxCenter.z + boxSize.z * 0.5f, },
+};
+static Color boxColor = GREEN;
 
 void WorldLayer::OnUpdate(float dt)
 {
-    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
+    if (Wreck::ConsoleLayer::Get()->IsOpen())
+        return;
+
+    UpdateCamera(&m_Camera, CAMERA_FREE);
+
+    for (auto& entity : m_Entities)
+        entity->Update(dt);
+
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
     {
-        if (IsCursorHidden()) EnableCursor();
-        else DisableCursor();
+        Vector2 screenCenter = { GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
+        Ray ray = GetScreenToWorldRay(screenCenter, m_Camera);
+        Wreck::RayCastHit hit = physics.Raycast(m_TestMap, ray);
+
+        if (hit.hit)
+            TraceLog(LOG_INFO, "Hit geometry at distance: %.2f.", hit.distance);
+        else
+            TraceLog(LOG_INFO, "Ray missed all geometry.");
     }
 
-    if (IsCursorHidden())
-    {
-        UpdateCamera(&m_Camera, CAMERA_FREE);
-    }
+    if (IsKeyDown(KEY_I)) testBoxY += 2.0f * dt;
+    if (IsKeyDown(KEY_K)) testBoxY -= 2.0f * dt;
+
+    // recalculate box coordinates every frame
+    boxCenter = { 0.0f, testBoxY, 0.0f };
+    testBox = {
+        { boxCenter.x - boxSize.x * 0.5f, boxCenter.y - boxSize.y * 0.5f, boxCenter.z - boxSize.z * 0.5f, },
+        { boxCenter.x + boxSize.x * 0.5f, boxCenter.y + boxSize.y * 0.5f, boxCenter.z + boxSize.z * 0.5f, },
+    };
+
+    // AABB overlap
+    bool isColliding = physics.CheckAABBOverlap(m_TestMap, testBox);
+    boxColor = isColliding ? RED : GREEN;
 }
 
 void WorldLayer::OnRender()
 {
-    // 1. Setup ray casting against your loaded map meshes
-    Ray ray = GetScreenToWorldRay(GetMousePosition(), m_Camera);
-    RayCollision collision = { 0 };
-    collision.distance = FLT_MAX;
-    collision.hit = false;
-
-    // Test ray collision against all sub-meshes in your loaded map
-    for (const auto& batch : m_MapRenderer.GetBatches()) // (Ensure you have a getter or access to raylib meshes)
-    {
-        RayCollision meshHit = GetRayCollisionMesh(ray, batch.raylibMesh, MatrixIdentity());
-        if (meshHit.hit && meshHit.distance < collision.distance)
-        {
-            collision = meshHit;
-        }
-    }
-
     BeginMode3D(m_Camera);
 
-    // Draw your world
-    m_MapRenderer.Draw();
-    DrawGrid(20, 1.0f);
+    for (auto& entity : m_Entities)
+        entity->Render();
 
-    // 2. If we ray-hit a mesh face, draw the indicator cube and normal ray vector!
-    if (collision.hit)
-    {
-        // Draw a small cube at the exact point where the mouse hit the mesh
-        DrawCube(collision.point, 0.2f, 0.2f, 0.2f, ORANGE);
-        DrawCubeWires(collision.point, 0.2f, 0.2f, 0.2f, RED);
+    DrawGrid(40, 1);
+    m_TestMap.RenderMap(); 
+    //m_TestMap.RenderBVH(); 
 
-        // Calculate normal vector projection endpoint
-        Vector3 normalEnd = {
-            collision.point.x + (collision.normal.x * 0.75f),
-            collision.point.y + (collision.normal.y * 0.75f),
-            collision.point.z + (collision.normal.z * 0.75f)
-        };
-
-        // Draw the normal ray line coming straight off the face
-        DrawLine3D(collision.point, normalEnd, GREEN);
-    }
-
-    DrawRay(ray, MAROON);
+    DrawCubeV(boxCenter, boxSize, Fade(boxColor, 0.4f));
+    DrawCubeWiresV(boxCenter, boxSize, boxColor);
 
     EndMode3D();
 
-    // 3. Screen Text Debug Overlay
-    DrawText("Right-click to toggle camera look", 10, 10, 20, DARKGRAY);
-    if (collision.hit)
-    {
-        DrawText(TextFormat("Hit Normal: %.2f, %.2f, %.2f", collision.normal.x, collision.normal.y, collision.normal.z), 10, 30, 20, BLACK);
-    }
-    else
-    {
-        DrawText("Hit: None", 10, 30, 20, BLACK);
-    }
+    int screenWidth = GetScreenWidth();
+    int screenHeight = GetScreenHeight();
+    DrawRectangle(screenWidth / 2 - 8, screenHeight / 2 - 2, 16, 4, WHITE);
+    DrawRectangle(screenWidth / 2 - 2, screenHeight / 2 - 8, 4, 16, WHITE);
 
-    DrawFPS(10, 50);
+    DrawFPS(10, 10);
 }

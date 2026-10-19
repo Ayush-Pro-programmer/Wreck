@@ -1,7 +1,8 @@
 #pragma once
-#include "Wreck.h"
-
 #include <vector>
+#include <memory>
+
+#include "Wreck.h"
 
 class WorldLayer : public Wreck::Layer
 {
@@ -15,10 +16,12 @@ public:
 	void OnRender() override;
 
 private:
+	float worldScale = 0.05f;
+
 	Camera3D m_Camera = { 0 };
-	
-	std::vector<Wreck::Mesh> m_MapMeshes;
-	Wreck::MapRenderer m_MapRenderer;
+	Wreck::MapLoader m_TestMap;
+	Wreck::PhysicsWorld physics;
+
+	std::vector<std::unique_ptr<Wreck::Entity>> m_Entities;
 };
 
-//FIXME: Add scope based object creation

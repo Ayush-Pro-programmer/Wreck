@@ -63,4 +63,10 @@ namespace Wreck {
 			EndDrawing();
 		}
 	}
+
+	void Application::Exit()
+	{
+		m_Running = false;
+		CloseWindow();
+	}
 }
