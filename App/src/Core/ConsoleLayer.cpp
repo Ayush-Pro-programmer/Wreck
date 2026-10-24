@@ -158,7 +158,7 @@ namespace Wreck {
 		if (m_AnimProgress > 0.4f)
 		{
 			int consoleHeight = static_cast<int>(currentConsoleHeight);
-			int fontSize = 16;
+			int fontSize = 18;
 			int padding = 10;
 			int yPos = consoleHeight - fontSize - padding - 20; // leaving room for input line
 

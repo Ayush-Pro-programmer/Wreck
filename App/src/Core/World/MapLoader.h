@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <fstream>
 #include <unordered_map>
 
 #include "raylib.h"
@@ -41,6 +42,10 @@ namespace Wreck {
 		std::string classname;
 		std::unordered_map<std::string, std::string> properties;
 
+		bool hasBrushEntity = false;
+		std::vector<RuntimeMesh> meshes;
+		std::vector<RuntimeTriangle> collisionTriangles;
+
 		std::string GetProperty(
 			const std::string& key,
 			const std::string& defaultValue = "") const
@@ -57,9 +62,14 @@ namespace Wreck {
 		MapLoader() = default;
 		~MapLoader() { Unload(); }
 
-		bool Load(const std::string& path, float scale = 0.05f); // loads WDF map file, can be scalled
-		void RenderMap() const;	// render actual map geometry
-		void RenderBVH() const;	// render bvh tree
+		// prevent dangerous shallow copies of GPU/CPU resources
+		MapLoader(const MapLoader&) = delete;
+		MapLoader& operator=(const MapLoader&) = delete;
+		MapLoader(MapLoader&&) noexcept = default;
+		MapLoader& operator=(MapLoader&&) noexcept = default;
+
+		bool Load(const std::string& path, float scale);
+		void RenderMap() const;	
 		void Unload();
 
 		const std::vector<RuntimeMesh>& GetMeshes() const { return m_Meshes; }
@@ -67,9 +77,8 @@ namespace Wreck {
 		const std::vector<RuntimeEntity>& GetEntities() const { return m_Entities; }
 
 	private:
-		bool LoadMeshes(std::ifstream& file, float scale,
-			uint32_t meshCount, Texture2D defaultTexture);
-		bool LoadBVH(std::ifstream& file, uint32_t nodeCount, float scale);
+		bool LoadMeshes(std::ifstream& file, uint32_t meshCount, std::vector<RuntimeMesh>& outMeshes);
+		bool LoadBVH(std::ifstream& file, uint32_t nodeCount);
 		bool LoadEntities(std::ifstream& file, uint32_t entityCount);
 
 	private:
@@ -77,8 +86,8 @@ namespace Wreck {
 		std::vector<RuntimeBVHNode> m_BVHNodes;
 		std::vector<RuntimeEntity> m_Entities;
 
-		mutable float m_BVHAnimTimer = 0.0f;
-		mutable int m_CurrentBVHStep = 0;
+		float m_Scale = 1.0f;
+		Texture2D m_DefaultTexture = { 0 };
 	};
 
 }

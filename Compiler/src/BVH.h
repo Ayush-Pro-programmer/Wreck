@@ -68,15 +68,20 @@ struct BVHWorldMap
 
 namespace BVHBuilder 
 {
+	inline Vector3 ConvertToRaylib(const Vector3& v)
+	{
+		return { -v.x, v.z, v.y };
+	}
+
 	inline AABB GetBrushBounds(const BrushData& brush)
 	{
 		AABB box;
 
 		for (const auto& plane : brush.planes)
 		{
-			box.Grow(plane.p1);
-			box.Grow(plane.p2);
-			box.Grow(plane.p3);
+			box.Grow(ConvertToRaylib(plane.p1));
+			box.Grow(ConvertToRaylib(plane.p2));
+			box.Grow(ConvertToRaylib(plane.p3));
 		}
 
 		// verify box integrity
@@ -91,14 +96,15 @@ namespace BVHBuilder
 
 	// recursive function to partition brushes and build tree nodes
 	inline int BuildRecursive(
-		std::vector<BrushData>& brushes,
+		const std::vector<BrushData>& brushes,
+		const std::vector<AABB>& brushBounds,
 		std::vector<size_t>& indices,
 		std::vector<BVHNode>& nodes)
 	{
 		BVHNode node;
 
 		for (size_t idx : indices)
-			node.bounds.Grow(GetBrushBounds(brushes[idx]));
+			node.bounds.Grow(brushBounds[idx]);
 
 		// base case: if 4 or fewer brushes, make this a leaf node
 		if (indices.size() <= 4)
@@ -120,8 +126,8 @@ namespace BVHBuilder
 		// sort indices
 		std::sort(indices.begin(), indices.end(), [&](size_t a, size_t b)
 			{
-				Vector3 centerA = GetBrushBounds(brushes[a]).Center();
-				Vector3 centerB = GetBrushBounds(brushes[b]).Center();
+				Vector3 centerA = brushBounds[a].Center();
+				Vector3 centerB = brushBounds[b].Center();
 
 				float valA = (axis == 0) ? centerA.x : (axis == 1) ? centerA.y : centerA.z;
 				float valB = (axis == 0) ? centerB.x : (axis == 1) ? centerB.y : centerB.z;
@@ -139,8 +145,8 @@ namespace BVHBuilder
 		nodes.push_back(node);
 
 		// resursively build children
-		int leftChild = BuildRecursive(brushes, leftIndices, nodes);
-		int rightChild = BuildRecursive(brushes, rightIndices, nodes);
+		int leftChild = BuildRecursive(brushes, brushBounds, leftIndices, nodes);
+		int rightChild = BuildRecursive(brushes, brushBounds, rightIndices, nodes);
 
 		// update node children indices
 		nodes[nodeIndex].leftChildIndex = leftChild;
@@ -156,10 +162,14 @@ namespace BVHBuilder
 
 		bvhMap.nodes.reserve(brushes.size() * 2);
 
+		std::vector<AABB> brushBounds(brushes.size());
+		for (size_t i = 0; i < brushes.size(); i++)
+			brushBounds[i] = GetBrushBounds(brushes[i]);
+
 		std::vector<size_t> indices(brushes.size());
 		for (size_t i = 0; i < brushes.size(); i++) indices[i] = i;
 
-		BuildRecursive(brushes, indices, bvhMap.nodes);
+		BuildRecursive(brushes, brushBounds, indices, bvhMap.nodes);
 		std::cout << " - BVH Build: Generated " << bvhMap.nodes.size() << " total tree nodes.\n";
 		return bvhMap;
 	}

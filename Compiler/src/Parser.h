@@ -56,7 +56,6 @@ namespace MapParser
 
 	inline bool ParseFile(
 		const std::string& inputPath,
-		std::vector<BrushData>& outBrushes, 
 		std::vector<EntityData>& outEntities)
 	{
 		std::cout << " - Parsing map file: " << inputPath << "\n";
@@ -103,7 +102,7 @@ namespace MapParser
 				if (insideBrushBlock)
 				{
 					if (!currentBrush.planes.empty())
-						outBrushes.push_back(currentBrush);
+						currentEntity.brushes.push_back(currentBrush);
 					
 					insideBrushBlock = false;
 				}
@@ -136,9 +135,12 @@ namespace MapParser
 			}
 		}
 
-		std::cout << " - Successfully parsed " << 
-			outBrushes.size() << " brushes and "
-			<< outEntities.size() << " entities\n";
+		size_t totalBrushes = 0;
+		for (const auto& entity : outEntities)
+			totalBrushes += entity.brushes.size();
+
+		std::cout << " - Successfully parsed " << outEntities.size() <<
+			" entities (containing " << totalBrushes << " total brushes)\n";
 		return true;
 	}
 }

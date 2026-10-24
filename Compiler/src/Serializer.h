@@ -82,17 +82,18 @@ namespace Serializer {
 
 	inline void WriteEntities(
 		std::ofstream& file,
-		const std::vector<EntityData>& entities)
+		const std::vector<EntityData>& entities,
+		const std::unordered_map<size_t, WorldMap>& brushEntity)
 	{
 		uint32_t entityCount = static_cast<uint32_t>(entities.size());
 		SerializerUtils::Write(file, entityCount);
 
-		for (const auto& entity : entities)
+		for (size_t i = 0; i < entities.size(); i++)
 		{
-			// write entity classname
+			const auto& entity = entities[i];
+
 			SerializerUtils::WriteString(file, entity.classname);
 
-			// write number of properties
 			uint32_t propCount = static_cast<uint32_t>(entity.properties.size());
 			SerializerUtils::Write(file, propCount);
 
@@ -101,14 +102,42 @@ namespace Serializer {
 				SerializerUtils::WriteString(file, key);
 				SerializerUtils::WriteString(file, value);
 			}
+
+			// check if this entity has compiled brush geometry
+			auto it = brushEntity.find(i);
+			bool hasBrushGeometry = (it != brushEntity.end());
+			SerializerUtils::Write(file, hasBrushGeometry);
+
+			if (hasBrushGeometry)
+			{
+				const WorldMap& brushMap = it->second;
+				WriteMeshes(file, brushMap.meshes);
+
+				size_t totalTriangles = 0;
+				for (const auto& bTris : brushMap.brushTriangles)
+					totalTriangles += bTris.size();
+
+				SerializerUtils::Write(file, static_cast<uint32_t>(totalTriangles));
+				for (const auto& bTris : brushMap.brushTriangles)
+				{
+					for (const auto& tri : bTris)
+					{
+						SerializerUtils::Write(file, tri.v0);
+						SerializerUtils::Write(file, tri.v1);
+						SerializerUtils::Write(file, tri.v2);
+					}
+				}
+			}
 		}
 	}
 }
 
 inline bool SerializeMap(
 	const std::string& outputPath,
-	const WorldMap& worldMap, const BVHWorldMap& bvhMap,
-	const std::vector<EntityData>& entities)
+	const WorldMap& worldMap,
+	const BVHWorldMap& bvhMap,
+	const std::vector<EntityData>& entities,
+	const std::unordered_map<size_t, WorldMap>& brushEntity)
 {
 	std::ofstream file(outputPath, std::ios::binary);
 	if (!file.is_open())
@@ -131,7 +160,7 @@ inline bool SerializeMap(
 	Serializer::WriteBVH(file, bvhMap, worldMap);
 
 	// write entities
-	Serializer::WriteEntities(file, entities);
+	Serializer::WriteEntities(file, entities, brushEntity);
 
 	return true;
 }

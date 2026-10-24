@@ -38,6 +38,20 @@ struct WorldMap
 
 namespace GeometryBuilder
 {
+
+	struct GeneratedFace
+	{
+		Plane plane;
+		std::vector<Vector3> poly;
+		PlaneData planeData;
+		size_t brushIndex;
+	};
+
+	inline Vector3 ConvertToRaylib(const Vector3& v)
+	{
+		return { -v.x, v.z, v.y };
+	}
+
 	// clips a polygon against a plane, returning the resulting clipped polygon
 	inline std::vector<Vector3> ClipPolygonToPlane(
 		const std::vector<Vector3>& poly,
@@ -92,7 +106,7 @@ namespace GeometryBuilder
 		return outputList;
 	}
 
-	// check if two 3D polygons overlap
+	// check if two 3D polygons overlap using 2D half-plane tests
 	inline bool DoPolygonsOverlap(
 		const std::vector<Vector3>& innerPoly ,
 		const std::vector<Vector3>& outerPoly,
@@ -105,39 +119,81 @@ namespace GeometryBuilder
 		Vector3 u = Vector3::Normalize(Vector3::Cross(plane.normal, majorAxis));
 		Vector3 v = Vector3::Normalize(Vector3::Cross(plane.normal, u));
 
-		auto getBounds2D = [&](const std::vector<Vector3>& poly, float& minX, float& maxX, float& minY, float& maxY)
+		// projects 3D polygon to 2D
+		auto to2D = [&](const std::vector<Vector3>& poly)
 			{
-				minX = minY = 1e30f;
-				maxX = maxY = -1e30f;
-
+				std::vector<Vector2> res;
+				res.reserve(poly.size());
 				for (const auto& p : poly)
-				{
-					float px = Vector3::Dot(p, u);
-					float py = Vector3::Dot(p, v);
-					minX = fminf(minX, px); maxX = fmaxf(maxX, px);
-					minY = fminf(minY, py); maxY = fmaxf(maxY, py);
-				}
+					res.push_back({ Vector3::Dot(p, u), Vector3::Dot(p, v) });
+
+				return res;
 			};
 
-		float minAX, maxAX, minAY, maxAY; // outer 
-		float minBX, maxBX, minBY, maxBY; // inner
-		getBounds2D(outerPoly, minAX, maxAX, minAY, maxAY);
-		getBounds2D(innerPoly, minBX, maxBX, minBY, maxBY);
+		std::vector<Vector2> outer2D = to2D(outerPoly);
+		std::vector<Vector2> inner2D = to2D(innerPoly);
 
-		// check if B's bound fit completely inside A's bound
-		bool insideX = (minBX >= minAX - tol) && (maxBX <= maxAX + tol);
-		bool insideY = (minBY >= minAY - tol) && (maxBY <= maxAY + tol);
+		auto IsPointInConvexPolygon = [](const Vector2& pt, const std::vector<Vector2>& poly, float tolerance)
+			{
+				bool hasPositive = false;
+				bool hasNegative = false;
+				size_t n = poly.size();
 
-		return insideX && insideY;
+				for (size_t i = 0; i < n; i++)
+				{
+					const Vector2& a = poly[i];
+					const Vector2& b = poly[(i + 1) % n];
+
+					float cross = (b.x - a.x) * (pt.y - a.y) - (b.y - a.y) * (pt.x - a.x);
+
+					if (cross > tolerance) hasPositive = true;
+					if (cross < -tolerance) hasNegative = true;
+
+					if (hasPositive && hasNegative) return false;
+				}
+
+				return true;
+			};
+
+		// check if ALL vertices of innerPoly are inside outerPoly
+		for (const auto& pt : inner2D)
+		{
+			if (!IsPointInConvexPolygon(pt, outer2D, tol))
+				return false;
+		}
+
+		return true;
 	}
 
-	struct GeneratedFace
+	// checks if an entire brush plane is completely buried inside a brush
+	inline bool IsFaceInsideBrush(
+		const GeneratedFace& face,
+		const BrushData& brush, float tol = 0.05)
 	{
-		Plane plane;
-		std::vector<Vector3> poly;
-		PlaneData planeData;
-		size_t brushIndex;
-	};
+		if (face.poly.empty()) return false;
+
+		auto IsPointInsideBrush = [](const Vector3& p, const BrushData& brush, float tol)
+			{
+				for (const auto& planeData : brush.planes)
+				{
+					Plane pEq = Plane::FromPoints(planeData.p1, planeData.p2, planeData.p3);
+					float dist = Vector3::Dot(pEq.normal, p) - pEq.dist;
+
+					if (dist > tol) return false;
+				}
+
+				return true;
+			};
+
+		for (const auto& v : face.poly)
+		{
+			if (!IsPointInsideBrush(v, brush, tol))
+				return false;
+		}
+
+		return true;
+	}
+
 
 	inline std::vector<GeneratedFace>
 		GenerateFaces(const std::vector<BrushData>& brushes)
@@ -183,10 +239,24 @@ namespace GeometryBuilder
 
 	inline void CullHiddenFaces(
 		const std::vector<GeneratedFace>& faces,
+		const std::vector<BrushData>& brushes,
 		std::vector<bool>& skipFace)
 	{
 		for (size_t i = 0; i < faces.size(); i++)
 		{
+			if (skipFace[i]) continue;
+
+			for (size_t bIdx = 0; bIdx < brushes.size(); bIdx++)
+			{
+				if (faces[i].brushIndex == bIdx) continue;
+
+				if (IsFaceInsideBrush(faces[i], brushes[bIdx]))
+				{
+					skipFace[i] = true;
+					break;
+				}
+			}
+
 			if (skipFace[i]) continue;
 
 			for (size_t j = i + 1; j < faces.size(); j++)
@@ -197,11 +267,11 @@ namespace GeometryBuilder
 
 				if (faces[i].plane.IsSharedBoundary(faces[j].plane))
 				{
-					bool iInsideJ = DoPolygonsOverlap(faces[j].poly, faces[i].poly, faces[i].plane);
-					bool jInsideI = DoPolygonsOverlap(faces[i].poly, faces[j].poly, faces[i].plane);
+					bool jInsideI = DoPolygonsOverlap(faces[j].poly, faces[i].poly, faces[i].plane);
+					bool iInsideJ = DoPolygonsOverlap(faces[i].poly, faces[j].poly, faces[i].plane);
 
 					// check if Face J is complete match of Face I
-					if (iInsideJ && jInsideI)
+					if (jInsideI && iInsideJ)
 					{
 						skipFace[i] = true;
 						skipFace[j] = true;
@@ -209,13 +279,12 @@ namespace GeometryBuilder
 					}
 
 					// check if Face J is completely inside Face I
-					if (iInsideJ)
+					if (jInsideI)
 					{
 						skipFace[j] = true;
-						break;
 					}
 					// check if Face I is completely inside Face J
-					else if (jInsideI)
+					else if (iInsideJ)
 					{
 						skipFace[i] = true;
 						break;
@@ -258,19 +327,22 @@ namespace GeometryBuilder
 
 			for (const auto& pos : face.poly)
 			{
+				Vector3 raylibPos = ConvertToRaylib(pos);
+				Vector3 raylibNormal = ConvertToRaylib(faceNormal);
+
 				float uCoord = (Vector3::Dot(pos, planeData.uAxis) + planeData.uShift) / (texWidth * planeData.scaleX);
 				float vCoord = (Vector3::Dot(pos, planeData.vAxis) + planeData.vShift) / (texWidth * planeData.scaleY);
 
-				mesh.vertices.push_back({ pos, faceNormal, uCoord, vCoord });
-				triVerts.push_back(pos);
+				mesh.vertices.push_back({ raylibPos, raylibNormal, uCoord, vCoord });
+				triVerts.push_back(raylibPos);
 			}
 
 			// triangulte the face polygon for rendering
 			for (size_t k = 1; k < face.poly.size() - 1; k++)
 			{
 				mesh.indices.push_back(startIndex);
-				mesh.indices.push_back(startIndex + static_cast<unsigned short>(k));
 				mesh.indices.push_back(startIndex + static_cast<unsigned short>(k + 1));
+				mesh.indices.push_back(startIndex + static_cast<unsigned short>(k));
 			}
 
 			// triangulate for collision triangles
@@ -278,8 +350,8 @@ namespace GeometryBuilder
 			{
 				worldMap.brushTriangles[face.brushIndex].push_back({
 					triVerts[0],
-					triVerts[k],
-					triVerts[k + 1]
+					triVerts[k + 1],
+					triVerts[k]
 				});
 			}
 		}
@@ -289,7 +361,7 @@ namespace GeometryBuilder
 			worldMap.meshes.push_back(mesh);
 	}
 
-	inline WorldMap Compile(const std::vector<BrushData>& brushes)
+	inline WorldMap Compile(const std::vector<BrushData>& brushes, bool enableCulling = true)
 	{
 		WorldMap worldMap;
 		worldMap.totalBrushes = brushes.size();
@@ -298,7 +370,9 @@ namespace GeometryBuilder
 		auto faces = GenerateFaces(brushes);
 
 		std::vector<bool> skipFace(faces.size(), false);
-		CullHiddenFaces(faces, skipFace);
+
+		if (enableCulling)
+			CullHiddenFaces(faces, brushes, skipFace);
 
 		BuildMeshesAndCollision(faces, skipFace, worldMap);
 
