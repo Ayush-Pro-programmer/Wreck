@@ -16,8 +16,6 @@
 #include "Core/World/MapLoader.h"
 #include "Core/World/MapManager.h"
 #include "Core/World/PhysicsWorld.h"
+#include "Core/World/PhysicsSolver.h"
 
-namespace Wreck {
-	inline constexpr float WORLD_SCALE = 0.05f;
-	inline constexpr float GRAVITY = 9.81f;
-}
+#include "WreckConst.h"

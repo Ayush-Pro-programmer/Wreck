@@ -2,13 +2,15 @@
 #include "MapManager.h"
 #include "EntityRegistry.h"
 
+#include "WreckConst.h"
+
 namespace Wreck {
 
-	bool MapManager::LoadMap(const std::string& path, float scale)
+	bool MapManager::LoadMap(const std::string& path)
 	{
 		UnloadMap();
 
-		m_CurrentScale = scale;
+		m_CurrentScale = Wreck::WORLD_SCALE;
 
 		if (!m_ActiveMap.Load(path, m_CurrentScale))
 		{

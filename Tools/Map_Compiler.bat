@@ -19,7 +19,7 @@ echo   ██  █  ██ ██████   █████   ██      �
 echo   ██ ███ ██ ██    ██ ██      ██      ██  ██  
 echo    ███ ███  ██    ██ ███████  ██████ ██   ██ 
 echo  ======================================================
-echo   [SYSTEM] WRECK ENGINE GEOMETRY COMPILER v1.0
+echo   [SYSTEM] WRECK ENGINE MAP COMPILER v1.0
 echo   [TARGET] TRENCHBROOM VALVE 220 MAP PIPELINE
 echo  ======================================================
 echo.

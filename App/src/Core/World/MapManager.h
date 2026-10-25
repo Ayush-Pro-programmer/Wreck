@@ -22,7 +22,7 @@ namespace Wreck {
 		MapManager(const MapManager&) = delete;
 		MapManager& operator=(const MapManager&) = delete;
 
-		bool LoadMap(const std::string& path, float scale = 1.0f);
+		bool LoadMap(const std::string& path);
 		void UnloadMap();
 
 		void Update(float dt);

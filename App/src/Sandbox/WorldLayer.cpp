@@ -11,8 +11,8 @@ void WorldLayer::OnAttach()
 {
     DisableCursor();
 
-    std::string mapPath = "E:/Programming/C++/Repos/Wreck/Assets/Maps/sandbox_01.wdf";
-    Wreck::MapManager::Get().LoadMap(mapPath, Wreck::WORLD_SCALE);
+    std::string mapPath = "E:/Programming/C++/Repos/Wreck/Assets/maps/sandbox_01.wdf";
+    Wreck::MapManager::Get().LoadMap(mapPath);
 }
 
 void WorldLayer::OnDetach()
