@@ -1,17 +1,15 @@
 #include "PlayerCamera.h"
 
-void PlayerCamera::Init(Wreck::Transform target)
+void PlayerCamera::Init(Vector3 target)
 {
-	m_Transform.position = target.position;
-	m_Transform.rotation = target.rotation;
-
+	position = target;
 	SetupCamera();
 }
 
 void PlayerCamera::SetupCamera()
 {
 	Camera3D& camera = Wreck::CameraManager::Get();
-	camera.position = m_Transform.position;
+	camera.position = position;
 	camera.target = { camera.position.x, camera.position.y, camera.position.z + 1.0f };
 	camera.up = { 0.0f, 1.0f, 0.0f };
 	camera.fovy = 45.0f;
@@ -27,7 +25,7 @@ void PlayerCamera::SyncCamera()
 	};
 
 	Camera3D& camera = Wreck::CameraManager::Get();
-	camera.position = m_Transform.position;
+	camera.position = position;
 	camera.target = camera.position + forward;
 }
 
@@ -39,12 +37,9 @@ void PlayerCamera::UpdateRotation(const Vector2& look)
 	// clamp pitch
 	if (m_Pitch > 1.57f) m_Pitch = 1.57f;
 	if (m_Pitch < -1.57f) m_Pitch = -1.57f;
-
-	m_Transform.rotation.x = m_Pitch;
-	m_Transform.rotation.y = m_Yaw;
 }
 
-void PlayerCamera::UpdatePosition(Wreck::Transform target)
+void PlayerCamera::UpdatePosition(Vector3 target)
 {
-	m_Transform.position = target.position;
+	position = target;
 }

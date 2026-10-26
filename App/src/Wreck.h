@@ -8,8 +8,6 @@
 #include "Core/ConsoleLayer.h"
 #include "Core/CameraManager.h"
 
-#include "Core/Transform.h"
-
 #include "Core/World/Entity.h"
 #include "Core/World/EntityRegistry.h"
 

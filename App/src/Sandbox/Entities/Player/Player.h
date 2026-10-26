@@ -17,6 +17,9 @@ public:
 	void Unload() override;
 
 private:
+	float eyeLevel = 2.5f;
+	Vector3 m_Target = { 0.0f, eyeLevel, 0.0f };
+
 	PlayerInput m_PInput;
 
 	PlayerCamera m_PCamera;

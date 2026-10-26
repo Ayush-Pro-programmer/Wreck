@@ -4,17 +4,20 @@
 class PlayerCamera
 {
 public:
-	void Init(Wreck::Transform target);
+	void Init(Vector3 target);
 	void SyncCamera();
 
 	void UpdateRotation(const Vector2& look);
-	void UpdatePosition(Wreck::Transform target);
+	void UpdatePosition(Vector3 target);
 
+	float GetYaw() const { return m_Yaw; }
+	float GetPitch() const { return m_Pitch; }
+ 
 private:
 	void SetupCamera();
 
 private:
-	Wreck::Transform m_Transform = {};
+	Vector3 position;
 
 	float m_Yaw = 0.0f;
 	float m_Pitch = 0.0f;

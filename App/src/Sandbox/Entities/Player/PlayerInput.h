@@ -15,8 +15,8 @@ struct PlayerInput
 
 		if (IsKeyDown(KEY_W)) move.y += 1.0f;
 		if (IsKeyDown(KEY_S)) move.y -= 1.0f;
-		if (IsKeyDown(KEY_A)) move.x -= 1.0f;
-		if (IsKeyDown(KEY_D)) move.x += 1.0f;
+		if (IsKeyDown(KEY_A)) move.x += 1.0f;
+		if (IsKeyDown(KEY_D)) move.x -= 1.0f;
 
 		jumpPressed = IsKeyPressed(KEY_SPACE);
 		jumpReleased = IsKeyReleased(KEY_SPACE);
